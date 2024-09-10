@@ -20,3 +20,7 @@ func NewBlock(index int, data string, previousHash string) *types.Block {
 	block.Hash = utils.CalculateHash(block)
 	return block
 }
+
+func CreateGenesisBlock() *types.Block {
+	return NewBlock(0, "Genesis Block", "")
+}

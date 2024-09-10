@@ -6,21 +6,24 @@ import (
 	"blockchain-simulator/pkg/transaction"
 	"blockchain-simulator/pkg/types"
 	"fmt"
+	"math/rand"
 	"time"
 )
 
+// chain에 대한 정보
 type Blockchain struct {
 	Blocks         []*types.Block
 	Validators     map[string]int
-	Transactions   []transaction.Transaction
+	memPool        []transaction.Transaction
 	BlockGasLimit  int           // 블록 가스 한도
 	TransactionGas int           // 트랜잭션당 가스 소비량
 	MiningInterval time.Duration // 블록 생성 주기
 }
 
+// 새로운 체인을 만드는 함수
 func NewBlockchain(blockGasLimit, transactionGas int, miningInterval time.Duration) *Blockchain {
 	bc := &Blockchain{
-		Blocks:         []*types.Block{createGenesisBlock()},
+		Blocks:         []*types.Block{block.CreateGenesisBlock()},
 		Validators:     make(map[string]int),
 		BlockGasLimit:  blockGasLimit,
 		TransactionGas: transactionGas,
@@ -31,30 +34,52 @@ func NewBlockchain(blockGasLimit, transactionGas int, miningInterval time.Durati
 	return bc
 }
 
-func createGenesisBlock() *types.Block {
-	return block.NewBlock(0, "Genesis Block", "")
-}
-
+// 트랜젝션을 mempool에 저장
 func (bc *Blockchain) AddTransaction(tx transaction.Transaction, gas int) {
-	bc.Transactions = append(bc.Transactions, tx)
+	bc.memPool = append(bc.memPool, tx)
 }
 
+// PoS 알고리즘을 활용하여 Validator를 알아냄
+func (bc *Blockchain) SelectValidator() string {
+	totalStake := 0
+
+	for _, stake := range bc.Validators {
+		totalStake += stake
+	}
+
+	randValue := rand.Intn(totalStake)
+	cumulaticeStake := 0
+
+	for validator, stake := range bc.Validators {
+		cumulaticeStake += stake
+		if randValue < cumulaticeStake {
+			return validator
+		}
+	}
+
+	return ""
+}
+
+// 작업 시작
 func (bc *Blockchain) startMining() {
 	for {
 		time.Sleep(bc.MiningInterval)
-		bc.CreateBlockFromTransactions("validator1")
+
+		validatorID := bc.SelectValidator()
+		bc.CreateBlockFromTransactions(validatorID)
 	}
 }
 
+// memPool에서 트랜젝션을 선택하여 블록을 생성하는 함수
 func (bc *Blockchain) CreateBlockFromTransactions(validatorID string) {
-	if len(bc.Transactions) == 0 {
+	if len(bc.memPool) == 0 {
 		return
 	}
 
 	// 가스 한도에 맞게 트랜잭션 선택
 	var selectedTxs []transaction.Transaction
 	var totalGas int
-	for _, tx := range bc.Transactions {
+	for _, tx := range bc.memPool {
 		if totalGas+bc.TransactionGas > bc.BlockGasLimit {
 			break
 		}
@@ -72,9 +97,10 @@ func (bc *Blockchain) CreateBlockFromTransactions(validatorID string) {
 	}
 
 	bc.AddBlock(data, validatorID)
-	bc.Transactions = bc.Transactions[len(selectedTxs):] // 선택한 트랜잭션을 큐에서 제거
+	bc.memPool = bc.memPool[len(selectedTxs):] // 선택한 트랜잭션을 큐에서 제거
 }
 
+// 블록을 추가하는 함수
 func (bc *Blockchain) AddBlock(data string, validatorID string) {
 	if !bc.isValidValidator(validatorID) {
 		fmt.Println("Invalid validator.")
@@ -94,6 +120,7 @@ func (bc *Blockchain) AddBlock(data string, validatorID string) {
 	bc.Blocks = append(bc.Blocks, newBlock)
 }
 
+// 블록에 대한 유효성을 검사
 func (bc *Blockchain) isValidNewBlock(newBlock, previousBlock *types.Block) bool {
 	// 블록의 인덱스 검증
 	if previousBlock.Index+1 != newBlock.Index {
@@ -113,6 +140,7 @@ func (bc *Blockchain) isValidNewBlock(newBlock, previousBlock *types.Block) bool
 	return true
 }
 
+// 검증자가 유요한자 확인
 func (bc *Blockchain) isValidValidator(validatorID string) bool {
 	_, exists := bc.Validators[validatorID]
 	return exists
