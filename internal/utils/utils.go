@@ -34,3 +34,34 @@ func CalculateHash(b *types.Block) string {
 	hashed := hash.Sum(nil)
 	return hex.EncodeToString(hashed)
 }
+
+// Merkle Root를 활용한 블록의 해시 생성
+func hashPair(left, right string) string {
+	h := sha256.New()
+	h.Write([]byte(left + right))
+
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// Merkel Root를 활용한 해시 생성
+func CalculateMerkelRoot(txHashes []string) string {
+	if len(txHashes) == 0 {
+		return ""
+	}
+
+	for len(txHashes) > 1 {
+		var newLevel []string
+
+		for i := 0; i < len(txHashes); i += 2 {
+			if i + 1 < len(txHashes) {
+				newLevel = append(newLevel, hashPair(txHashes[i], txHashes[i+1]))
+			} else {
+				newLevel = append(newLevel, txHashes[i])
+			}
+		}
+
+		txHashes = newLevel
+	}
+
+	return txHashes[0]
+}
