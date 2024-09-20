@@ -1,36 +1,43 @@
 package transaction
 
-import "fmt"
+import (
+	"crypto/ecdsa"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+
+	"golang.org/x/crypto/sha3"
+)
 
 // Transaction 인터페이스 정의
-type Transaction interface {
-	Process() error
+type Transaction struct {
+	ID        string
+	From      ecdsa.PublicKey
+	To        ecdsa.PublicKey
+	Amount    int
+	Gas       int
+	Signature []byte
 }
 
-// 계약 함수 실행 트랜잭션
-type ContractExecutionTransaction struct {
-	ContractID string
-	Function   string
-	Params     []interface{}
+// 서명된 거래의 메세지를 생성
+func (tx *Transaction) Message() []byte {
+	data := tx.ID + tx.From.X.String() + tx.From.Y.String() + tx.To.X.String() + tx.To.Y.String() + fmt.Sprint(tx.Amount) + fmt.Sprint(tx.Gas)
+	hash := sha256.Sum256([]byte(data))
+	return hash[:]
 }
 
-func (tx *ContractExecutionTransaction) Process() error {
-	// 계약 함수 실행 로직
-	fmt.Printf("Executing contract ID: %s, Function: %s with params: %v\n", tx.ContractID, tx.Function, tx.Params)
-	// 예를 들어, 계약의 함수 호출 로직 구현
-	return nil
+// 공개키를 기반으로 주소를 알아냄
+func hashPublicKey(pubkey ecdsa.PublicKey) string {
+	pubKeyBytes := append(pubkey.X.Bytes(), pubkey.Y.Bytes()...)
+
+	hash := sha3.NewLegacyKeccak256()
+	hash.Write(pubKeyBytes)
+	addressBytes := hash.Sum(nil)
+
+	return hex.EncodeToString(addressBytes[:])
 }
 
-// 송금 트랜잭션
-type TransferTransaction struct {
-	From   string
-	To     string
-	Amount float64
-}
-
-func (tx *TransferTransaction) Process() error {
-	// 송금 로직
-	fmt.Printf("Transferring %f from %s to %s\n", tx.Amount, tx.From, tx.To)
-	// 예를 들어, 계좌의 잔액을 업데이트하는 로직 구현
-	return nil
+// 발신자 주소를 반환하는 메소드 (공개키를 해시하여 주소를 생성 )
+func (tx *Transaction) FromAddress() string {
+	return hashPublicKey(tx.From)
 }
