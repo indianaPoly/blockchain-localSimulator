@@ -167,6 +167,16 @@ func (bc *Blockchain) startMining() {
 }
 
 // reward 분배 (구현)
+func (bc *Blockchain) distributeRewards (validatorID string) {
+	if _, exists := bc.Validators[validatorID]; exists {
+		if bc.ValidatorRewards == nil {
+			bc.ValidatorRewards = make(map[string]float64)
+		}
+		bc.ValidatorRewards[validatorID] += bc.RewardPerBlock
+	} else {
+		fmt.Println("Invalid validator, reward not distributed")
+	}
+}
 
 // memPool에서 트랜젝션을 선택하여 블록을 생성하는 함수
 // 여기서 구현이 됨.
