@@ -53,7 +53,7 @@ func CalculateMerkelRoot(txHashes []string) string {
 		var newLevel []string
 
 		for i := 0; i < len(txHashes); i += 2 {
-			if i + 1 < len(txHashes) {
+			if i+1 < len(txHashes) {
 				newLevel = append(newLevel, hashPair(txHashes[i], txHashes[i+1]))
 			} else {
 				newLevel = append(newLevel, txHashes[i])

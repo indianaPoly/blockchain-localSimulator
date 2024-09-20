@@ -16,15 +16,15 @@ import (
 
 // chain에 대한 정보
 type Blockchain struct {
-	Blocks         []*types.Block
-	Validators     map[string]int
-	memPool        []transaction.Transaction
-	BlockGasLimit  int                 // 블록 가스 한도
-	TransactionGas int                 // 트랜잭션당 가스 소비량
-	MiningInterval time.Duration       // 블록 생성 주기
-	balances       map[string]*big.Int // 발신자 주소를 키로 사용하여 잔액을 저장
+	Blocks           []*types.Block
+	Validators       map[string]int
+	memPool          []transaction.Transaction
+	BlockGasLimit    int                 // 블록 가스 한도
+	TransactionGas   int                 // 트랜잭션당 가스 소비량
+	MiningInterval   time.Duration       // 블록 생성 주기
+	balances         map[string]*big.Int // 발신자 주소를 키로 사용하여 잔액을 저장
 	ValidatorRewards map[string]float64
-	RewardPerBlock float64
+	RewardPerBlock   float64
 }
 
 // 새로운 체인을 만드는 함수
@@ -72,7 +72,7 @@ func (bc *Blockchain) getBalance(address string) *big.Int {
 // 잔액이 충분한지 확인하는 함수
 func (bc *Blockchain) hasSufficientBalance(tx transaction.Transaction) bool {
 	balance := bc.balances[tx.From.X.String()]
-	
+
 	amount := new(big.Int).SetInt64(int64(tx.Amount))
 	gas := new(big.Int).SetInt64(int64(tx.Gas))
 
@@ -167,7 +167,7 @@ func (bc *Blockchain) startMining() {
 }
 
 // reward 분배 (구현)
-func (bc *Blockchain) distributeRewards (validatorID string) {
+func (bc *Blockchain) distributeRewards(validatorID string) {
 	if _, exists := bc.Validators[validatorID]; exists {
 		if bc.ValidatorRewards == nil {
 			bc.ValidatorRewards = make(map[string]float64)
