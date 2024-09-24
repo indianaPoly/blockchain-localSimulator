@@ -25,16 +25,20 @@ type Blockchain struct {
 	balances         map[string]*big.Int // 발신자 주소를 키로 사용하여 잔액을 저장
 	ValidatorRewards map[string]float64
 	RewardPerBlock   float64
+	MaxBlockSize int
+	MiniValidators int
 }
 
 // 새로운 체인을 만드는 함수
-func NewBlockchain(blockGasLimit, transactionGas int, miningInterval time.Duration) *Blockchain {
+func NewBlockchain(blockGasLimit, transactionGas int, miningInterval time.Duration, maxBlockSize int, minValidators int) *Blockchain {
 	bc := &Blockchain{
 		Blocks:         []*types.Block{block.CreateGenesisBlock()},
 		Validators:     make(map[string]int),
 		BlockGasLimit:  blockGasLimit,
 		TransactionGas: transactionGas,
 		MiningInterval: miningInterval,
+		MaxBlockSize: maxBlockSize,
+		MiniValidators: minValidators,
 	}
 
 	go bc.startMining() // 백그라운드에서 블록 생성 시작
@@ -55,7 +59,7 @@ func (bc *Blockchain) verifySignature(tx transaction.Transaction) bool {
 	return ecdsa.Verify(pubKey, hash[:], r, s)
 }
 
-// r금액 설정
+// 금액 설정
 func (bc *Blockchain) setBalance(address string, amount *big.Int) {
 	bc.balances[address] = amount
 }
@@ -178,26 +182,25 @@ func (bc *Blockchain) distributeRewards(validatorID string) {
 	}
 }
 
-// memPool에서 트랜젝션을 선택하여 블록을 생성하는 함수
+// memPool에서 트랜젝션을 선택하여 Merkle Root를 기반으로 블록을 생성하는 함수
 // 여기서 구현이 됨.
 func (bc *Blockchain) CreateBlockFromTransactions(validatorID string) {
 	if len(bc.memPool) == 0 {
 		return
 	}
 
+	if !bc.isValidValidator(validatorID) {
+		return
+	}
+
 	// 가스 한도에 맞게 트랜잭션 선택
 	var selectedTxs []transaction.Transaction
-	var txHashes []string
 	var totalGas int
 
 	for _, tx := range bc.memPool {
 		if totalGas+bc.TransactionGas > bc.BlockGasLimit {
 			break
 		}
-
-		txHash := utils.CalculateTransactionHash(tx)
-		txHashes = append(txHashes, txHash)
-
 		selectedTxs = append(selectedTxs, tx)
 		totalGas += bc.TransactionGas
 	}
@@ -211,28 +214,40 @@ func (bc *Blockchain) CreateBlockFromTransactions(validatorID string) {
 		data += fmt.Sprintf(" %v;", tx)
 	}
 
-	bc.AddBlock(data, validatorID)
+	_, err := bc.CreateBlockWithMerkleRoot(selectedTxs, validatorID)
+
+	if err != nil {
+		return
+	}
+
 	bc.memPool = bc.memPool[len(selectedTxs):] // 선택한 트랜잭션을 큐에서 제거
 }
 
-// 블록을 추가하는 함수
-func (bc *Blockchain) AddBlock(data string, validatorID string) {
+func (bc *Blockchain) CreateBlockWithMerkleRoot (transactions []transaction.Transaction, validatorID string) (*types.Block, error) {
 	if !bc.isValidValidator(validatorID) {
-		fmt.Println("Invalid validator.")
-		return
+		return nil, errors.New("유효하지 않은 검증자")
 	}
 
 	previousBlock := bc.Blocks[len(bc.Blocks)-1]
 	newIndex := previousBlock.Index + 1
-	newBlock := block.NewBlock(newIndex, data, previousBlock.Hash)
 
-	// 블록의 해시를 검증
-	if !bc.isValidNewBlock(newBlock, previousBlock) {
-		fmt.Println("Invalid block, not adding to blockchain.")
-		return
+	// 트랜젝션 해시 계산
+	txHashes := make([]string, len(transactions))
+	for i, tx := range transactions {
+		txHashes[i] = utils.CalculateTransactionHash(tx)
 	}
 
+	merkleRoot := utils.CalculateMerkelRoot(txHashes)
+
+	newBlock := block.NewBlock(newIndex, "", previousBlock.MerkleRoot, transactions, merkleRoot)
+
+	isValidNewBlock := bc.isValidNewBlock(newBlock, previousBlock)
+	if !isValidNewBlock {
+		return nil, nil
+	}
 	bc.Blocks = append(bc.Blocks, newBlock)
+
+	return newBlock, nil
 }
 
 // 블록에 대한 유효성을 검사
@@ -243,12 +258,12 @@ func (bc *Blockchain) isValidNewBlock(newBlock, previousBlock *types.Block) bool
 	}
 
 	// 블록의 해시 검증
-	if newBlock.PreviousHash != previousBlock.Hash {
+	if newBlock.PreviousHash != previousBlock.MerkleRoot {
 		return false
 	}
 
-	// 블록의 해시가 올바르게 계산되었는지 검증
-	if newBlock.Hash != utils.CalculateHash(newBlock) {
+	// 블록의 해시가 올바르게 계산되었는지 검증 (이거 수정해야됨.)
+	if newBlock.MerkleRoot != utils.CalculateHash(newBlock) {
 		return false
 	}
 
