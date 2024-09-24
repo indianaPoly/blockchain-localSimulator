@@ -59,19 +59,19 @@ func (bc *Blockchain) verifySignature(tx transaction.Transaction) bool {
 	return ecdsa.Verify(pubKey, hash[:], r, s)
 }
 
-// 금액 설정
-func (bc *Blockchain) setBalance(address string, amount *big.Int) {
-	bc.balances[address] = amount
-}
-
-// 금액 가져오기
-func (bc *Blockchain) getBalance(address string) *big.Int {
-	balance, exists := bc.balances[address]
-	if !exists {
-		return big.NewInt(0)
-	}
-	return balance
-}
+// // 금액 설정
+// func (bc *Blockchain) setBalance(address string, amount *big.Int) {
+// 	bc.balances[address] = amount
+// }
+// 
+// // 금액 가져오기
+// func (bc *Blockchain) getBalance(address string) *big.Int {
+// 	balance, exists := bc.balances[address]
+// 	if !exists {
+// 		return big.NewInt(0)
+// 	}
+// 	return balance
+// }
 
 // 잔액이 충분한지 확인하는 함수
 func (bc *Blockchain) hasSufficientBalance(tx transaction.Transaction) bool {
@@ -82,11 +82,7 @@ func (bc *Blockchain) hasSufficientBalance(tx transaction.Transaction) bool {
 
 	total := new(big.Int).Add(amount, gas)
 
-	if balance.Cmp(total) >= 0 {
-		return true
-	}
-
-	return false
+	return balance.Cmp(total) >= 0
 }
 
 // 중복 거래를 확인하는 함수
@@ -171,16 +167,16 @@ func (bc *Blockchain) startMining() {
 }
 
 // reward 분배 (구현)
-func (bc *Blockchain) distributeRewards(validatorID string) {
-	if _, exists := bc.Validators[validatorID]; exists {
-		if bc.ValidatorRewards == nil {
-			bc.ValidatorRewards = make(map[string]float64)
-		}
-		bc.ValidatorRewards[validatorID] += bc.RewardPerBlock
-	} else {
-		fmt.Println("Invalid validator, reward not distributed")
-	}
-}
+// func (bc *Blockchain) distributeRewards(validatorID string) {
+// 	if _, exists := bc.Validators[validatorID]; exists {
+// 		if bc.ValidatorRewards == nil {
+// 			bc.ValidatorRewards = make(map[string]float64)
+// 		}
+// 		bc.ValidatorRewards[validatorID] += bc.RewardPerBlock
+// 	} else {
+// 		fmt.Println("Invalid validator, reward not distributed")
+// 	}
+// }
 
 // memPool에서 트랜젝션을 선택하여 Merkle Root를 기반으로 블록을 생성하는 함수
 // 여기서 구현이 됨.
