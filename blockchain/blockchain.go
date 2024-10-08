@@ -1,10 +1,8 @@
-package chain
+package blockchain
 
 import (
-	"blockchain-simulator/internal/utils"
-	"blockchain-simulator/pkg/block"
-	"blockchain-simulator/pkg/transaction"
-	"blockchain-simulator/pkg/types"
+	"blockchain-simulator/types"
+	"blockchain-simulator/utils"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"errors"
@@ -18,26 +16,26 @@ import (
 type Blockchain struct {
 	Blocks           []*types.Block
 	Validators       map[string]int
-	memPool          []transaction.Transaction
+	memPool          []types.Transaction
 	BlockGasLimit    int                 // 블록 가스 한도
 	TransactionGas   int                 // 트랜잭션당 가스 소비량
 	MiningInterval   time.Duration       // 블록 생성 주기
 	balances         map[string]*big.Int // 발신자 주소를 키로 사용하여 잔액을 저장
 	ValidatorRewards map[string]float64
 	RewardPerBlock   float64
-	MaxBlockSize int
-	MiniValidators int
+	MaxBlockSize     int
+	MiniValidators   int
 }
 
 // 새로운 체인을 만드는 함수
 func NewBlockchain(blockGasLimit, transactionGas int, miningInterval time.Duration, maxBlockSize int, minValidators int) *Blockchain {
 	bc := &Blockchain{
-		Blocks:         []*types.Block{block.CreateGenesisBlock()},
+		Blocks:         []*types.Block{CreateGenesisBlock()},
 		Validators:     make(map[string]int),
 		BlockGasLimit:  blockGasLimit,
 		TransactionGas: transactionGas,
 		MiningInterval: miningInterval,
-		MaxBlockSize: maxBlockSize,
+		MaxBlockSize:   maxBlockSize,
 		MiniValidators: minValidators,
 	}
 
@@ -46,48 +44,24 @@ func NewBlockchain(blockGasLimit, transactionGas int, miningInterval time.Durati
 }
 
 // 올바른 서명이 되었는지를 확인하는 코드
-func (bc *Blockchain) verifySignature(tx transaction.Transaction) bool {
-	// 거래의 메시지를 추출
-	msg := tx.Message()
-	// 메시지의 해시값을 생성
-	hash := sha256.Sum256(msg)
-
+func (bc *Blockchain) verifySignature(tx types.Transaction) bool {
+	hash := sha256.Sum256([]byte(tx.ID)) // 트랜잭션 ID로 해시 생성
 	pubKey := &tx.From
 	r := new(big.Int).SetBytes(tx.Signature[:len(tx.Signature)/2])
 	s := new(big.Int).SetBytes(tx.Signature[len(tx.Signature)/2:])
-
 	return ecdsa.Verify(pubKey, hash[:], r, s)
 }
 
-// // 금액 설정
-// func (bc *Blockchain) setBalance(address string, amount *big.Int) {
-// 	bc.balances[address] = amount
-// }
-// 
-// // 금액 가져오기
-// func (bc *Blockchain) getBalance(address string) *big.Int {
-// 	balance, exists := bc.balances[address]
-// 	if !exists {
-// 		return big.NewInt(0)
-// 	}
-// 	return balance
-// }
-
 // 잔액이 충분한지 확인하는 함수
-func (bc *Blockchain) hasSufficientBalance(tx transaction.Transaction) bool {
+func (bc *Blockchain) hasSufficientBalance(tx types.Transaction) bool {
 	balance := bc.balances[tx.From.X.String()]
-
-	amount := new(big.Int).SetInt64(int64(tx.Amount))
-	gas := new(big.Int).SetInt64(int64(tx.Gas))
-
-	total := new(big.Int).Add(amount, gas)
-
+	total := new(big.Int).Add(big.NewInt(int64(tx.Amount)), big.NewInt(int64(tx.Gas)))
 	return balance.Cmp(total) >= 0
 }
 
 // 중복 거래를 확인하는 함수
 // 동일한 트랜젝션 아이디가 존재하면 true 반환
-func (bc *Blockchain) isDuplicate(tx transaction.Transaction) bool {
+func (bc *Blockchain) isDuplicate(tx types.Transaction) bool {
 	for _, existingTx := range bc.memPool {
 		if existingTx.ID == tx.ID {
 			return true
@@ -98,7 +72,7 @@ func (bc *Blockchain) isDuplicate(tx transaction.Transaction) bool {
 }
 
 // 트랜젝션을 확인하는 함수
-func (bc *Blockchain) validateTransaction(tx transaction.Transaction) error {
+func (bc *Blockchain) validateTransaction(tx types.Transaction) error {
 	if tx.Amount <= 0 {
 		return errors.New("보내는 금액이 0보다 작습니다")
 	}
@@ -124,7 +98,7 @@ func (bc *Blockchain) validateTransaction(tx transaction.Transaction) error {
 
 // 트랜젝션을 mempool에 저장
 // 검증하는 로직이 추가적으로 필요할 것으로 판단이 됨.
-func (bc *Blockchain) AddTransaction(tx transaction.Transaction, gas int) error {
+func (bc *Blockchain) AddTransaction(tx types.Transaction, gas int) error {
 	err := bc.validateTransaction(tx)
 	if err != nil {
 		return err
@@ -190,7 +164,7 @@ func (bc *Blockchain) CreateBlockFromTransactions(validatorID string) {
 	}
 
 	// 가스 한도에 맞게 트랜잭션 선택
-	var selectedTxs []transaction.Transaction
+	var selectedTxs []types.Transaction
 	var totalGas int
 
 	for _, tx := range bc.memPool {
@@ -219,7 +193,7 @@ func (bc *Blockchain) CreateBlockFromTransactions(validatorID string) {
 	bc.memPool = bc.memPool[len(selectedTxs):] // 선택한 트랜잭션을 큐에서 제거
 }
 
-func (bc *Blockchain) CreateBlockWithMerkleRoot (transactions []transaction.Transaction, validatorID string) (*types.Block, error) {
+func (bc *Blockchain) CreateBlockWithMerkleRoot(transactions []types.Transaction, validatorID string) (*types.Block, error) {
 	if !bc.isValidValidator(validatorID) {
 		return nil, errors.New("유효하지 않은 검증자")
 	}
@@ -235,7 +209,7 @@ func (bc *Blockchain) CreateBlockWithMerkleRoot (transactions []transaction.Tran
 
 	merkleRoot := utils.CalculateMerkelRoot(txHashes)
 
-	newBlock := block.NewBlock(newIndex, "", previousBlock.MerkleRoot, transactions, merkleRoot)
+	newBlock := NewBlock(newIndex, "", previousBlock.MerkleRoot, transactions, merkleRoot)
 
 	isValidNewBlock := bc.isValidNewBlock(newBlock, previousBlock)
 	if !isValidNewBlock {
@@ -266,7 +240,7 @@ func (bc *Blockchain) isValidNewBlock(newBlock, previousBlock *types.Block) bool
 	return true
 }
 
-// 검증자가 유요한자 확인
+// 검증자가 유효한지 확인
 func (bc *Blockchain) isValidValidator(validatorID string) bool {
 	_, exists := bc.Validators[validatorID]
 	return exists

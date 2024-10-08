@@ -1,14 +1,13 @@
-package block
+package blockchain
 
 import (
-	"blockchain-simulator/pkg/transaction"
-	"blockchain-simulator/pkg/types"
+	"blockchain-simulator/types"
 	"time"
 )
 
 // * : 메모리 주소에 저장된 값에 접근
 // & : 주소를 나탬
-func NewBlock(index int, data string, previousHash string, transactions []transaction.Transaction, merkleRoot string) *types.Block {
+func NewBlock(index int, data string, previousHash string, transactions []types.Transaction, merkleRoot string) *types.Block {
 	timestamp := time.Now().String()
 	block := &types.Block{
 		Index:        index,
@@ -22,5 +21,5 @@ func NewBlock(index int, data string, previousHash string, transactions []transa
 }
 
 func CreateGenesisBlock() *types.Block {
-	return NewBlock(0, "Genesis Block", "", []transaction.Transaction{}, "")
+	return NewBlock(0, "Genesis Block", "", []types.Transaction{}, "")
 }

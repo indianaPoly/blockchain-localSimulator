@@ -1,8 +1,7 @@
 package utils
 
 import (
-	"blockchain-simulator/pkg/transaction"
-	"blockchain-simulator/pkg/types"
+	"blockchain-simulator/types"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,7 +13,7 @@ func SerializePublicKey(pubKey ecdsa.PublicKey) string {
 	return fmt.Sprintf("%x%x", pubKey.X, pubKey.Y)
 }
 
-func CalculateTransactionHash(tx transaction.Transaction) string {
+func CalculateTransactionHash(tx types.Transaction) string {
 	fromKey := SerializePublicKey(tx.From)
 	toKey := SerializePublicKey(tx.To)
 
