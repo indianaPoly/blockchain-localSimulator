@@ -12,7 +12,7 @@ import (
 // chain에 대한 정보
 type Blockchain struct {
 	Blocks           []*types.Block
-	Validators       map[string]int
+	Validators       map[string]*Validator
 	memPool          []types.Transaction
 	BlockGasLimit    int                 // 블록 가스 한도
 	TransactionGas   int                 // 트랜잭션당 가스 소비량
@@ -28,7 +28,7 @@ type Blockchain struct {
 func NewBlockchain(blockGasLimit, transactionGas int, miningInterval time.Duration, maxBlockSize int, minValidators int) *Blockchain {
 	bc := &Blockchain{
 		Blocks:         []*types.Block{CreateGenesisBlock()},
-		Validators:     make(map[string]int),
+		Validators:     make(map[string]*Validator),
 		BlockGasLimit:  blockGasLimit,
 		TransactionGas: transactionGas,
 		MiningInterval: miningInterval,
