@@ -3,12 +3,9 @@ package blockchain
 import (
 	"blockchain-simulator/types"
 	"blockchain-simulator/utils"
-	"crypto/ecdsa"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"time"
 )
 
@@ -43,59 +40,6 @@ func NewBlockchain(blockGasLimit, transactionGas int, miningInterval time.Durati
 	return bc
 }
 
-// 올바른 서명이 되었는지를 확인하는 코드
-func (bc *Blockchain) verifySignature(tx types.Transaction) bool {
-	hash := sha256.Sum256([]byte(tx.ID)) // 트랜잭션 ID로 해시 생성
-	pubKey := &tx.From
-	r := new(big.Int).SetBytes(tx.Signature[:len(tx.Signature)/2])
-	s := new(big.Int).SetBytes(tx.Signature[len(tx.Signature)/2:])
-	return ecdsa.Verify(pubKey, hash[:], r, s)
-}
-
-// 잔액이 충분한지 확인하는 함수
-func (bc *Blockchain) hasSufficientBalance(tx types.Transaction) bool {
-	balance := bc.balances[tx.From.X.String()]
-	total := new(big.Int).Add(big.NewInt(int64(tx.Amount)), big.NewInt(int64(tx.Gas)))
-	return balance.Cmp(total) >= 0
-}
-
-// 중복 거래를 확인하는 함수
-// 동일한 트랜젝션 아이디가 존재하면 true 반환
-func (bc *Blockchain) isDuplicate(tx types.Transaction) bool {
-	for _, existingTx := range bc.memPool {
-		if existingTx.ID == tx.ID {
-			return true
-		}
-	}
-
-	return false
-}
-
-// 트랜젝션을 확인하는 함수
-func (bc *Blockchain) validateTransaction(tx types.Transaction) error {
-	if tx.Amount <= 0 {
-		return errors.New("보내는 금액이 0보다 작습니다")
-	}
-
-	if tx.Gas < 1 {
-		return errors.New("가스값이 최소 단위보다 작습니다.")
-	}
-
-	if !bc.verifySignature(tx) {
-		return errors.New("서명이 올바르지 않습니다.")
-	}
-
-	if !bc.hasSufficientBalance(tx) {
-		return errors.New("insufficient balacnce for tx")
-	}
-
-	if bc.isDuplicate(tx) {
-		return errors.New("tx is a duplicate")
-	}
-
-	return nil
-}
-
 // 트랜젝션을 mempool에 저장
 // 검증하는 로직이 추가적으로 필요할 것으로 판단이 됨.
 func (bc *Blockchain) AddTransaction(tx types.Transaction, gas int) error {
@@ -109,27 +53,6 @@ func (bc *Blockchain) AddTransaction(tx types.Transaction, gas int) error {
 	return nil
 }
 
-// PoS 알고리즘을 활용하여 Validator를 알아냄
-func (bc *Blockchain) SelectValidator() string {
-	totalStake := 0
-
-	for _, stake := range bc.Validators {
-		totalStake += stake
-	}
-
-	randValue := rand.Intn(totalStake)
-	cumulaticeStake := 0
-
-	for validator, stake := range bc.Validators {
-		cumulaticeStake += stake
-		if randValue < cumulaticeStake {
-			return validator
-		}
-	}
-
-	return ""
-}
-
 // 작업 시작
 func (bc *Blockchain) startMining() {
 	for {
@@ -139,18 +62,6 @@ func (bc *Blockchain) startMining() {
 		bc.CreateBlockFromTransactions(validatorID)
 	}
 }
-
-// reward 분배 (구현)
-// func (bc *Blockchain) distributeRewards(validatorID string) {
-// 	if _, exists := bc.Validators[validatorID]; exists {
-// 		if bc.ValidatorRewards == nil {
-// 			bc.ValidatorRewards = make(map[string]float64)
-// 		}
-// 		bc.ValidatorRewards[validatorID] += bc.RewardPerBlock
-// 	} else {
-// 		fmt.Println("Invalid validator, reward not distributed")
-// 	}
-// }
 
 // memPool에서 트랜젝션을 선택하여 Merkle Root를 기반으로 블록을 생성하는 함수
 // 여기서 구현이 됨.
@@ -218,30 +129,4 @@ func (bc *Blockchain) CreateBlockWithMerkleRoot(transactions []types.Transaction
 	bc.Blocks = append(bc.Blocks, newBlock)
 
 	return newBlock, nil
-}
-
-// 블록에 대한 유효성을 검사
-func (bc *Blockchain) isValidNewBlock(newBlock, previousBlock *types.Block) bool {
-	// 블록의 인덱스 검증
-	if previousBlock.Index+1 != newBlock.Index {
-		return false
-	}
-
-	// 블록의 해시 검증
-	if newBlock.PreviousHash != previousBlock.MerkleRoot {
-		return false
-	}
-
-	// 블록의 해시가 올바르게 계산되었는지 검증 (이거 수정해야됨.)
-	if newBlock.MerkleRoot != utils.CalculateHash(newBlock) {
-		return false
-	}
-
-	return true
-}
-
-// 검증자가 유효한지 확인
-func (bc *Blockchain) isValidValidator(validatorID string) bool {
-	_, exists := bc.Validators[validatorID]
-	return exists
 }
